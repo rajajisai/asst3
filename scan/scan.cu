@@ -77,26 +77,25 @@ void exclusive_scan(int* input, int N, int* result)
     const int threads_per_block=32;
 
     int rounded_length= nextPow2(N);
-
+    cudaMemcpy(result,input,rounded_length*sizeof(int),cudaMemcpyDeviceToDevice);
 
     for (int two_d = 1; two_d <= rounded_length/2; two_d*=2) {
         int two_dplus1 = 2*two_d;
         const int num_threads_required = rounded_length / two_dplus1;
         const int blocks = num_threads_required / threads_per_block + 1;
-        exclusive_scan_upsweep_kernel<<<blocks, threads_per_block>>>(rounded_length, two_d, two_dplus1, input);
+        exclusive_scan_upsweep_kernel<<<blocks, threads_per_block>>>(rounded_length, two_d, two_dplus1, result);
         
     }
     cudaDeviceSynchronize();
-    cudaMemset(input+ rounded_length -1, 0, sizeof(int));
+    cudaMemset(result+ rounded_length -1, 0, sizeof(int));
 
     for (int two_d = rounded_length/2; two_d >= 1; two_d /= 2) {
         int two_dplus1 = 2*two_d;
         const int num_threads_required=rounded_length/two_dplus1;
         const int blocks= num_threads_required/threads_per_block+1;
-        exclusive_scan_downsweep_kernel<<<blocks,threads_per_block>>>(rounded_length,two_d,two_dplus1,input);
+        exclusive_scan_downsweep_kernel<<<blocks,threads_per_block>>>(rounded_length,two_d,two_dplus1,result);
     }
-
-    cudaMemcpy(result,input,rounded_length*sizeof(int),cudaMemcpyDeviceToDevice);
+    cudaDeviceSynchronize();
 }
 
 
