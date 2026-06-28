@@ -188,21 +188,43 @@ double cudaScanThrust(int* inarray, int* end, int* resultarray) {
 // indices `i` for which `device_input[i] == device_input[i+1]`.
 //
 // Returns the total number of pairs found
+__global__ void
+find_repeat_flag_kernel(int length,int * input, int* flag) {
+    int index = blockIdx.x * blockDim.x + threadIdx.x;
+    if (index < length-1) {
+        flag[index] = (input[index]==input[index+1]);
+    }
+}
+__global__ void
+find_repeat_reduce_kernel(int length,int * flag,int * prefix,int * output){
+    int index = blockIdx.x * blockDim.x + threadIdx.x;
+    if (index < length && flag[index]==1) {
+        output[prefix[index]] = index;
+    }
+}
 int find_repeats(int* device_input, int length, int* device_output) {
 
-    // CS149 TODO:
-    //
-    // Implement this function. You will probably want to
-    // make use of one or more calls to exclusive_scan(), as well as
-    // additional CUDA kernel launches.
-    //    
-    // Note: As in the scan code, the calling code ensures that
-    // allocated arrays are a power of 2 in size, so you can use your
-    // exclusive_scan function with them. However, your implementation
-    // must ensure that the results of find_repeats are correct given
-    // the actual array length.
+    int rounded_length=nextPow2(length);
+    const int num_threads_per_block=512;
+    const int blocks= (rounded_length+num_threads_per_block-1)/num_threads_per_block;
 
-    return 0; 
+    
+    int * flag;
+    int * prefix;
+    cudaMalloc((void **)&flag,rounded_length*sizeof(int));
+    cudaMalloc((void **)&prefix,rounded_length*sizeof(int));
+    
+    find_repeat_flag_kernel<<<blocks,num_threads_per_block>>>(rounded_length,device_input,flag);
+    exclusive_scan(flag,length,prefix);
+    find_repeat_reduce_kernel<<<blocks,num_threads_per_block>>>(rounded_length,flag,prefix,device_output);
+    cudaDeviceSynchronize();
+    cudaMemset(device_output+length-1,0,sizeof(int));
+    if(length==1){
+        return 0;
+    }
+    int result;
+    cudaMemcpy(&result, &prefix[length-1], sizeof(int), cudaMemcpyDeviceToHost);
+    return result;
 }
 
 
