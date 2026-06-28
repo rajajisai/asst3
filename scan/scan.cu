@@ -78,7 +78,6 @@ void exclusive_scan(int* input, int N, int* result)
 
     int rounded_length= nextPow2(N);
 
-    // const int blocks = (rounded_length + threads_per_block - 1) / threads_per_block;
 
     for (int two_d = 1; two_d <= rounded_length/2; two_d*=2) {
         int two_dplus1 = 2*two_d;
@@ -95,7 +94,6 @@ void exclusive_scan(int* input, int N, int* result)
         const int num_threads_required=rounded_length/two_dplus1;
         const int blocks= num_threads_required/threads_per_block+1;
         exclusive_scan_downsweep_kernel<<<blocks,threads_per_block>>>(rounded_length,two_d,two_dplus1,input);
-        // cudaDeviceSynchronize();
     }
 
     cudaMemcpy(result,input,rounded_length*sizeof(int),cudaMemcpyDeviceToDevice);
