@@ -42,6 +42,27 @@ static inline int nextPow2(int n) {
 // Also, as per the comments in cudaScan(), you can implement an
 // "in-place" scan, since the timing harness makes a copy of input and
 // places it in result
+__global__ void
+exclusive_scan_upsweep_kernel(int N,int inc, int inc_1, int* output) {
+
+    int index = (blockIdx.x * blockDim.x + threadIdx.x) * inc_1;  // segment start
+    if (index < N) {
+        output[index + inc_1 - 1] += output[index + inc - 1];
+    }
+
+}
+__global__ void
+exclusive_scan_downsweep_kernel(int N,int inc, int inc_1, int* output) {
+    int index = (blockIdx.x * blockDim.x + threadIdx.x) * inc_1;  // segment start
+
+    if (index < N) {
+        int left  = index + inc - 1;
+        int right = index + inc_1 - 1;
+        int t = output[left];
+        output[left] = output[right];
+        output[right] += t;
+    }
+}
 void exclusive_scan(int* input, int N, int* result)
 {
 
@@ -53,8 +74,31 @@ void exclusive_scan(int* input, int N, int* result)
     // on the CPU.  Your implementation will need to make multiple calls
     // to CUDA kernel functions (that you must write) to implement the
     // scan.
+    const int threads_per_block=32;
 
+    int rounded_length= nextPow2(N);
 
+    // const int blocks = (rounded_length + threads_per_block - 1) / threads_per_block;
+
+    for (int two_d = 1; two_d <= rounded_length/2; two_d*=2) {
+        int two_dplus1 = 2*two_d;
+        const int num_threads_required = rounded_length / two_dplus1;
+        const int blocks = num_threads_required / threads_per_block + 1;
+        exclusive_scan_upsweep_kernel<<<blocks, threads_per_block>>>(rounded_length, two_d, two_dplus1, input);
+        
+    }
+    cudaDeviceSynchronize();
+    cudaMemset(input+ rounded_length -1, 0, sizeof(int));
+
+    for (int two_d = rounded_length/2; two_d >= 1; two_d /= 2) {
+        int two_dplus1 = 2*two_d;
+        const int num_threads_required=rounded_length/two_dplus1;
+        const int blocks= num_threads_required/threads_per_block+1;
+        exclusive_scan_downsweep_kernel<<<blocks,threads_per_block>>>(rounded_length,two_d,two_dplus1,input);
+        // cudaDeviceSynchronize();
+    }
+
+    cudaMemcpy(result,input,rounded_length*sizeof(int),cudaMemcpyDeviceToDevice);
 }
 
 
