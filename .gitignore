@@ -1,0 +1,6 @@
+scan/logs
+scan/cudaScan
+scan/objs
+
+saxpy/objs
+saxpy/cudaSaxpy
