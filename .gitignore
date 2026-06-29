@@ -4,3 +4,7 @@ scan/objs
 
 saxpy/objs
 saxpy/cudaSaxpy
+
+render/*.ppm
+render/objs
+render/logs
