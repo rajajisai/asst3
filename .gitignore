@@ -8,3 +8,4 @@ saxpy/cudaSaxpy
 render/*.ppm
 render/objs
 render/logs
+render/render
